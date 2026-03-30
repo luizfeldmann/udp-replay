@@ -8,6 +8,8 @@
 // STD
 #include <ranges>
 #include <iostream>
+#include <charconv>
+#include <unordered_map>
 
 //! Implements the accessors to the command line arguments
 class CCommandLineArguments
@@ -50,6 +52,9 @@ private:
 
     //! The name of the network interface to use
     std::string m_strInterface;
+
+    //! Maps original to rewritten port numbers
+    std::unordered_map<unsigned short, unsigned short> m_mapPorts;
 
 public:
     //! Constructor
@@ -140,7 +145,51 @@ public:
             m_eLimit = ELimitMode::LIMIT_MAX_PACKETS;
 
         // Parse the port remap
-        // TODO
+        auto splitPortMappings = std::views::split(strPortRemap, ',');
+        for (auto &&portMapping : splitPortMappings)
+        {
+            // Find the colon delimiter
+            std::string_view svPortEntry(portMapping.begin(), portMapping.end());
+            const size_t nColon = svPortEntry.find(':');
+            if (std::string_view::npos == nColon)
+                throw std::invalid_argument("each port pair must be delimited by a colon ('from:to')");
+
+            // Right side
+            unsigned short usToPort = 0;
+            const std::from_chars_result rightMatch = std::from_chars(svPortEntry.begin() + nColon + 1, svPortEntry.end(), usToPort);
+            if (std::errc{} != rightMatch.ec || rightMatch.ptr != svPortEntry.end())
+                throw std::invalid_argument("invalid rewritten port");
+
+            // Left side can be a single port or a range
+            unsigned usFromPort1 = 0;
+            const std::from_chars_result leftMatch = std::from_chars(svPortEntry.begin(), svPortEntry.begin() + nColon, usFromPort1);
+            if (std::errc{} != leftMatch.ec)
+                throw std::invalid_argument("invalid matched port");
+
+            if (*leftMatch.ptr == '-')
+            {
+                // Left side is a range
+                unsigned usFromPort2 = 0;
+                const std::from_chars_result middleMatch = std::from_chars(leftMatch.ptr + 1, svPortEntry.begin() + nColon, usFromPort2);
+                if (std::errc{} != middleMatch.ec || middleMatch.ptr != svPortEntry.begin() + nColon)
+                    throw std::invalid_argument("invalid rewritten port");
+
+                if (usFromPort2 <= usFromPort1)
+                    throw std::invalid_argument("end port of range must be larger than start port");
+
+                // Store the full range in the map
+                for (unsigned p = usFromPort1; p <= usFromPort2; ++p)
+                    m_mapPorts[p] = usToPort;
+            }
+            else if (leftMatch.ptr == svPortEntry.begin() + nColon)
+            {
+                // Left side is a single port
+                m_mapPorts[usFromPort1] = usToPort;
+            }
+        }
+
+        // The job is valid
+        m_op = ECommandLineOperation::JOB;
     }
 
     ECommandLineOperation get_operation() const override
@@ -220,7 +269,12 @@ public:
 
     unsigned short get_port_remap(unsigned short usOriginalPort) const override
     {
-        return usOriginalPort; // TODO
+        const auto it = m_mapPorts.find(usOriginalPort);
+        if (it != m_mapPorts.cend())
+            return it->second;
+
+        // Return original port if not remapping is found
+        return usOriginalPort;
     }
 
     std::string_view get_ipv4_destination_remap(std::string_view dest_ipv4) const override

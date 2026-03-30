@@ -29,14 +29,13 @@ configure_file("src/version.in.c" ${VERSION_FILE_SRC})
 find_package(cxxopts)
 find_package(PcapPlusPlus)
 
-# Add executable
-add_executable(${CMAKE_PROJECT_NAME}
+# Add helper library
+add_library(${CMAKE_PROJECT_NAME}-lib STATIC
     # Generated files
     ${VERSION_FILE_SRC}
-    # App Sources
+    # Sources
     "src/parsecli.cpp"
-    "src/main.cpp"
-    # App Headers
+    # Headers
     "include/ELimitMode.h"
     "include/ERepeatMode.h"
     "include/ESpeedMode.h"
@@ -45,9 +44,33 @@ add_executable(${CMAKE_PROJECT_NAME}
     "include/parsecli.h"
     "include/version.h" )
 
-target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC 
+target_include_directories(${CMAKE_PROJECT_NAME}-lib PUBLIC 
     "include" )
 
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
+target_link_libraries(${CMAKE_PROJECT_NAME}-lib PUBLIC
     PcapPlusPlus::PcapPlusPlus
     cxxopts::cxxopts )
+
+# Add executable
+add_executable(${CMAKE_PROJECT_NAME}
+    "src/main.cpp" )
+
+target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC
+    ${CMAKE_PROJECT_NAME}-lib )
+
+# Only build tests if enabled
+option(BUILD_TESTS "Build unit tests" ON)
+
+if(BUILD_TESTS)
+    enable_testing()
+    find_package(GTest REQUIRED)
+
+    add_executable(unit-tests 
+        "test/cli.test.cpp" )
+    target_link_libraries(unit-tests PRIVATE 
+        ${CMAKE_PROJECT_NAME}-lib 
+        GTest::gtest_main )
+
+    include(GoogleTest)
+    gtest_discover_tests(unit-tests)
+endif()
