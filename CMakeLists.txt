@@ -38,6 +38,7 @@ add_library(${CMAKE_PROJECT_NAME}-lib STATIC
     # Generated files
     ${VERSION_FILE_SRC}
     # Sources
+    "src/error.cpp"
     "src/parsecli.cpp"
     # Headers
     "include/ELimitMode.h"
@@ -45,6 +46,7 @@ add_library(${CMAKE_PROJECT_NAME}-lib STATIC
     "include/ESpeedMode.h"
     "include/IJobArguments.h"
     "include/ICommandLineArguments.h"
+    "include/error.h"
     "include/parsecli.h"
     "include/version.h" )
 

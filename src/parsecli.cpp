@@ -1,6 +1,7 @@
 // Local
 #include "parsecli.h"
 #include "version.h"
+#include "error.h"
 
 // Dependencies
 #include <cxxopts.hpp>
@@ -79,19 +80,19 @@ private:
             const std::string_view svPortEntry(portPair.begin(), portPair.end());
             const size_t nColon = svPortEntry.find(':');
             if (std::string_view::npos == nColon)
-                throw std::invalid_argument("each port pair must be delimited by a colon ('from:to')");
+                throw std::system_error(EAppError::InvalidPortDelimiter);
 
             // Right side
             unsigned short usToPort = 0;
             const std::from_chars_result rightMatch = std::from_chars(svPortEntry.begin() + nColon + 1, svPortEntry.end(), usToPort);
             if (std::errc{} != rightMatch.ec || rightMatch.ptr != svPortEntry.end())
-                throw std::invalid_argument("invalid rewritten port");
+                throw std::system_error(EAppError::InvalidRewritePort);
 
             // Left side can be a single port or a range
             unsigned usFromPort1 = 0;
             const std::from_chars_result leftMatch = std::from_chars(svPortEntry.begin(), svPortEntry.begin() + nColon, usFromPort1);
             if (std::errc{} != leftMatch.ec)
-                throw std::invalid_argument("invalid matched port");
+                throw std::system_error(EAppError::InvalidMatchPort);
 
             if (*leftMatch.ptr == '-')
             {
@@ -99,10 +100,10 @@ private:
                 unsigned usFromPort2 = 0;
                 const std::from_chars_result middleMatch = std::from_chars(leftMatch.ptr + 1, svPortEntry.begin() + nColon, usFromPort2);
                 if (std::errc{} != middleMatch.ec || middleMatch.ptr != svPortEntry.begin() + nColon)
-                    throw std::invalid_argument("invalid rewritten port");
+                    throw std::system_error(EAppError::InvalidRewritePort);
 
                 if (usFromPort2 <= usFromPort1)
-                    throw std::invalid_argument("end port of range must be larger than start port");
+                    throw std::system_error(EAppError::InvalidPortRangeOrder);
 
                 // Store the full range in the map
                 for (unsigned p = usFromPort1; p <= usFromPort2; ++p)
@@ -136,7 +137,7 @@ private:
     {
         const size_t nDelim = svAddrEntryV4.find(':');
         if (std::string_view::npos == nDelim)
-            throw std::invalid_argument("expected colon delimiter in IPv4 address pair");
+            throw std::system_error(EAppError::InvalidAddressDelimiter);
 
         const std::string left(svAddrEntryV4.begin(), svAddrEntryV4.begin() + nDelim);
         const std::string right(svAddrEntryV4.begin() + nDelim + 1, svAddrEntryV4.end());
@@ -145,7 +146,7 @@ private:
         pcpp::IPv4Network netTo(right);
 
         if (netFrom.getPrefixLen() != netTo.getPrefixLen())
-            throw std::invalid_argument("the networks in the pair have different prefix lengths");
+            throw std::system_error(EAppError::InvalidPrefixLengthUnmatch);
 
         m_mapV4.emplace_back(netFrom, netTo);
     }
@@ -154,11 +155,11 @@ private:
     {
         // Ensure its in format '[]:[]'
         if (!svAddrEntryV6.ends_with(']'))
-            throw std::invalid_argument("malformed IPv6 pair");
+            throw std::system_error(EAppError::InvalidIPv6Pair);
 
         const size_t nDelim = svAddrEntryV6.find("]:[");
         if (std::string_view::npos == nDelim)
-            throw std::invalid_argument("expected colon delimiter in IPv6 address pair");
+            throw std::system_error(EAppError::InvalidAddressDelimiter);
 
         const std::string left(svAddrEntryV6.begin() + 1, svAddrEntryV6.begin() + nDelim);
         const std::string right(svAddrEntryV6.begin() + nDelim + 3, svAddrEntryV6.end() - 1);
@@ -167,7 +168,7 @@ private:
         pcpp::IPv6Network netTo(right);
 
         if (netFrom.getPrefixLen() != netTo.getPrefixLen())
-            throw std::invalid_argument("the networks in the pair have different prefix lengths");
+            throw std::system_error(EAppError::InvalidPrefixLengthUnmatch);
 
         m_mapV6.emplace_back(netFrom, netTo);
     }
@@ -210,7 +211,7 @@ public:
 
         // Check combination of mutually exclusive options
         if ((bShowHelp || bShowVersion || bShowInterfaces) && parsed.arguments().size() > 1)
-            throw std::invalid_argument("combining mutually exclusive options");
+            throw std::system_error(EAppError::ConflictOperations);
 
         // Check the modes used to print and exit
         if (bShowHelp)
@@ -234,7 +235,10 @@ public:
 
         // Validate job arguments
         if (m_strFilePath.empty())
-            throw std::invalid_argument("requires input file path");
+            throw std::system_error(EAppError::MissingArgFile);
+
+        if (m_strInterface.empty())
+            throw std::system_error(EAppError::MissingArgInterface);
 
         // Validate the speed mode
         if (parsed.contains("multiplier"))
@@ -254,7 +258,7 @@ public:
         const bool bLimitDuration = parsed.contains("duration");
 
         if (bLimitDuration && bLimitPackets)
-            throw std::invalid_argument("cannot specify both duration limit and number of packets limit");
+            throw std::system_error(EAppError::ConflictLimit);
         else if (bLimitDuration)
             m_eLimit = ELimitMode::LIMIT_MAX_TIME;
         else if (bLimitPackets)
@@ -281,7 +285,7 @@ public:
     IJobArguments const &get_job_arguments() const override
     {
         if (m_op != ECommandLineOperation::JOB)
-            throw std::runtime_error("job not specified");
+            throw std::system_error(EAppError::NoJob);
         return *this;
     }
 
@@ -308,7 +312,7 @@ public:
     unsigned int get_repeat_count() const override
     {
         if (m_eRepeat != ERepeatMode::REPEAT_TIMES)
-            throw std::runtime_error("repeat count not defined");
+            throw std::system_error(EAppError::UndefinedRepeatCount);
         return m_uRepeatTimes;
     }
 
@@ -320,14 +324,14 @@ public:
     unsigned int get_limit_packets() const override
     {
         if (m_eLimit != ELimitMode::LIMIT_MAX_PACKETS)
-            throw std::runtime_error("packets limit not defined");
+            throw std::system_error(EAppError::UndefinedLimitPackets);
         return m_uLimitPackets;
     }
 
     unsigned int get_limit_duration() const override
     {
         if (m_eLimit != ELimitMode::LIMIT_MAX_TIME)
-            throw std::runtime_error("duration limit not defined");
+            throw std::system_error(EAppError::UndefinedLimitDuration);
         return m_uLimitTime;
     }
 
@@ -339,7 +343,7 @@ public:
     double get_speed_multiplier() const override
     {
         if (m_eSpeed != ESpeedMode::SPEED_MULTIPLIER)
-            throw std::runtime_error("speed multiplier not defined");
+            throw std::system_error(EAppError::UndefinedSpeedMultiplier);
         return m_dSpeedMultiplier;
     }
 
