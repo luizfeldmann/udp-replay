@@ -161,7 +161,7 @@ private:
             throw std::invalid_argument("expected colon delimiter in IPv6 address pair");
 
         const std::string left(svAddrEntryV6.begin() + 1, svAddrEntryV6.begin() + nDelim);
-        const std::string right(svAddrEntryV6.begin() + nDelim + 3, svAddrEntryV6.end());
+        const std::string right(svAddrEntryV6.begin() + nDelim + 3, svAddrEntryV6.end() - 1);
 
         pcpp::IPv6Network netFrom(left);
         pcpp::IPv6Network netTo(right);
@@ -365,9 +365,12 @@ public:
         if (it == m_mapV4.cend())
             return inputAddr;
 
-        // Combine network prefix with varying host
+        // Found a subnet to remap
         pcpp::IPv4Network const &remapToNetwork = it->second;
-        const uint32_t mask = 0xFFFFFFFF << (32 - remapToNetwork.getPrefixLen());
+        const uint8_t uPrefixLen = remapToNetwork.getPrefixLen();
+
+        // Combine network prefix with varying host
+        const uint32_t mask = 0xFFFFFFFF << (32 - uPrefixLen);
 
         const uint32_t prefix = pcpp::netToHost32(remapToNetwork.getNetworkPrefix().toInt()) & mask;
         const uint32_t host = pcpp::netToHost32(inputAddr.toInt()) & ~mask;
@@ -375,9 +378,51 @@ public:
         return pcpp::IPv4Address(pcpp::hostToNet32(prefix | host));
     }
 
-    pcpp::IPv6Address get_ipv6_destination_remap(pcpp::IPv6Address const &dest_ipv6) const override
+    pcpp::IPv6Address get_ipv6_destination_remap(pcpp::IPv6Address const &inputAddr) const override
     {
-        return dest_ipv6; // TODO
+        // Find the remap entry containing this address
+        auto it = std::find_if(
+            m_mapV6.cbegin(), m_mapV6.cend(),
+            [&inputAddr](IPv6Remap const &pair)
+            { return pair.first.includes(inputAddr); });
+
+        // Return same address if not found
+        if (it == m_mapV6.cend())
+            return inputAddr;
+
+        // Found a network to remap
+        pcpp::IPv6Network const &remapToNetwork = it->second;
+        const uint8_t *pNetworkPrefix = remapToNetwork.getNetworkPrefix().toBytes();
+        const uint8_t *pInputAddr = inputAddr.toBytes();
+
+        // The network prefix has a part with whole bytes then a split byte
+        uint8_t uPrefix = remapToNetwork.getPrefixLen();
+        const uint8_t uFullBytes = uPrefix / 8;
+        const uint8_t uRemainingBits = uPrefix % 8;
+
+        // Combine network prefix with varying host
+        uint8_t i = 0;
+        uint8_t result[16];
+
+        // Bytes fully defined by the network prefix
+        for (; i < uFullBytes; ++i)
+            result[i] = pNetworkPrefix[i];
+
+        // Byte split between network prefix and host
+        if (uRemainingBits > 0)
+        {
+            const uint8_t mask = 0xFF << (8 - uRemainingBits);
+            result[i] =
+                (pNetworkPrefix[uFullBytes] & mask) |
+                (pInputAddr[uFullBytes] & ~mask);
+            ++i;
+        }
+
+        // Bytes fully defined by the input
+        for (; i < std::size(result); ++i)
+            result[i] = pInputAddr[i];
+
+        return pcpp::IPv6Address(result);
     }
 };
 

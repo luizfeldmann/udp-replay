@@ -212,3 +212,33 @@ TEST(cli, destremap_v4_multi)
                   pcpp::IPv4Address("172.16.10.69")),
               pcpp::IPv4Address("172.31.55.69"));
 }
+
+TEST(cli, destremap_v6_64)
+{
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--dstipmap=[2001:db8::/64]:[fd00:beef::/64]",
+        g_szInputFileName,
+    };
+    auto pCli = parse_cli(std::size(argv), argv);
+
+    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
+    EXPECT_EQ(pCli->get_job_arguments().get_ipv6_destination_remap(
+                  pcpp::IPv6Address("2001:db8::5678:9abc:def0:1111")),
+              pcpp::IPv6Address("fd00:beef::5678:9abc:def0:1111"));
+}
+
+TEST(cli, destremap_v6_36)
+{
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--dstipmap=[2001:db8::/36]:[3001:dea::/36]",
+        g_szInputFileName,
+    };
+    auto pCli = parse_cli(std::size(argv), argv);
+
+    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
+    EXPECT_EQ(pCli->get_job_arguments().get_ipv6_destination_remap(
+                  pcpp::IPv6Address("2001:db8:0bcd:1234:5678::1")),
+              pcpp::IPv6Address("3001:dea:0bcd:1234:5678::1"));
+}
