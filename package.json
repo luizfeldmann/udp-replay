@@ -6,5 +6,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/luizfeldmann/udp-replay"
+  },
+  "author": {
+    "name": "Luiz Gustavo Pfitscher e Feldmann",
+    "url": "https://linkedin.com/in/luizgustavopf"
   }
 }

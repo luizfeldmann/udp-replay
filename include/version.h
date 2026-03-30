@@ -18,6 +18,15 @@ extern "C"
     //! Reads the version sem-ver
     const char *version_number();
 
+    //! Reads the timestamp of the build
+    const char *build_timestamp();
+
+    //! Reads the project's homepage URL
+    const char *project_homepage_url();
+
+    //! Reads the license name
+    const char *project_license_name();
+
 #ifdef __cplusplus
 }
 #endif // __cplusplus

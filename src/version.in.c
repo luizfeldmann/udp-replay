@@ -18,3 +18,21 @@ const char *version_number()
     static const char *szVersionNumber = "${CMAKE_PROJECT_VERSION}";
     return szVersionNumber;
 }
+
+const char *build_timestamp()
+{
+    static const char *szVersionBuildTimestamp = "${BUILD_TIME}";
+    return szVersionBuildTimestamp;
+}
+
+const char *project_homepage_url()
+{
+    static const char *szHomepageURL = "${CMAKE_PROJECT_HOMEPAGE_URL}";
+    return szHomepageURL;
+}
+
+const char *project_license_name()
+{
+    static const char *szLicenseName = "${CMAKE_PROJECT_SPDX_LICENSE}";
+    return szLicenseName;
+}
