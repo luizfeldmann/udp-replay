@@ -4,12 +4,19 @@
 
 // Dependencies
 #include <cxxopts.hpp>
+#include <pcapplusplus/SystemUtils.h>
 
 // STD
 #include <ranges>
 #include <iostream>
 #include <charconv>
 #include <unordered_map>
+
+//! Entry mapping an between IPv4 subnets
+using IPv4Remap = std::pair<pcpp::IPv4Network, pcpp::IPv4Network>;
+
+//! Entry mapping an between IPv6 subnets
+using IPv6Remap = std::pair<pcpp::IPv6Network, pcpp::IPv6Network>;
 
 //! Implements the accessors to the command line arguments
 class CCommandLineArguments
@@ -56,6 +63,115 @@ private:
     //! Maps original to rewritten port numbers
     std::unordered_map<unsigned short, unsigned short> m_mapPorts;
 
+    //! Map between V4 subnets
+    std::vector<IPv4Remap> m_mapV4;
+
+    //! Map between V6 subnets
+    std::vector<IPv6Remap> m_mapV6;
+
+    //! Parses the port remap argument
+    void parse_port_remap(std::string_view svPortRemap)
+    {
+        auto splitPortMappings = std::views::split(svPortRemap, ',');
+        for (auto &&portPair : splitPortMappings)
+        {
+            // Find the colon delimiter
+            const std::string_view svPortEntry(portPair.begin(), portPair.end());
+            const size_t nColon = svPortEntry.find(':');
+            if (std::string_view::npos == nColon)
+                throw std::invalid_argument("each port pair must be delimited by a colon ('from:to')");
+
+            // Right side
+            unsigned short usToPort = 0;
+            const std::from_chars_result rightMatch = std::from_chars(svPortEntry.begin() + nColon + 1, svPortEntry.end(), usToPort);
+            if (std::errc{} != rightMatch.ec || rightMatch.ptr != svPortEntry.end())
+                throw std::invalid_argument("invalid rewritten port");
+
+            // Left side can be a single port or a range
+            unsigned usFromPort1 = 0;
+            const std::from_chars_result leftMatch = std::from_chars(svPortEntry.begin(), svPortEntry.begin() + nColon, usFromPort1);
+            if (std::errc{} != leftMatch.ec)
+                throw std::invalid_argument("invalid matched port");
+
+            if (*leftMatch.ptr == '-')
+            {
+                // Left side is a range
+                unsigned usFromPort2 = 0;
+                const std::from_chars_result middleMatch = std::from_chars(leftMatch.ptr + 1, svPortEntry.begin() + nColon, usFromPort2);
+                if (std::errc{} != middleMatch.ec || middleMatch.ptr != svPortEntry.begin() + nColon)
+                    throw std::invalid_argument("invalid rewritten port");
+
+                if (usFromPort2 <= usFromPort1)
+                    throw std::invalid_argument("end port of range must be larger than start port");
+
+                // Store the full range in the map
+                for (unsigned p = usFromPort1; p <= usFromPort2; ++p)
+                    m_mapPorts[p] = usToPort;
+            }
+            else if (leftMatch.ptr == svPortEntry.begin() + nColon)
+            {
+                // Left side is a single port
+                m_mapPorts[usFromPort1] = usToPort;
+            }
+        }
+    }
+
+    //! Parse the address remap argument
+    void parse_dest_addr_remap(std::string_view svDestAddrRemap)
+    {
+        auto splitAddrMappings = std::views::split(svDestAddrRemap, ',');
+        for (auto &&addrPair : splitAddrMappings)
+        {
+            const std::string_view svAddrEntry(addrPair.begin(), addrPair.end());
+
+            // Handle IPv6 in format [from]:[to]
+            if (svAddrEntry.starts_with('['))
+                parse_addr_remap_v6(svAddrEntry);
+            else
+                parse_addr_remap_v4(svAddrEntry);
+        }
+    }
+
+    void parse_addr_remap_v4(const std::string_view svAddrEntryV4)
+    {
+        const size_t nDelim = svAddrEntryV4.find(':');
+        if (std::string_view::npos == nDelim)
+            throw std::invalid_argument("expected colon delimiter in IPv4 address pair");
+
+        const std::string left(svAddrEntryV4.begin(), svAddrEntryV4.begin() + nDelim);
+        const std::string right(svAddrEntryV4.begin() + nDelim + 1, svAddrEntryV4.end());
+
+        pcpp::IPv4Network netFrom(left);
+        pcpp::IPv4Network netTo(right);
+
+        if (netFrom.getPrefixLen() != netTo.getPrefixLen())
+            throw std::invalid_argument("the networks in the pair have different prefix lengths");
+
+        m_mapV4.emplace_back(netFrom, netTo);
+    }
+
+    void parse_addr_remap_v6(const std::string_view svAddrEntryV6)
+    {
+        // Ensure its in format '[]:[]'
+        if (!svAddrEntryV6.ends_with(']'))
+            throw std::invalid_argument("malformed IPv6 pair");
+
+        const size_t nDelim = svAddrEntryV6.find("]:[");
+        if (std::string_view::npos == nDelim)
+            throw std::invalid_argument("expected colon delimiter in IPv6 address pair");
+
+        const std::string left(svAddrEntryV6.begin() + 1, svAddrEntryV6.begin() + nDelim);
+        const std::string right(svAddrEntryV6.begin() + nDelim + 3, svAddrEntryV6.end());
+
+        pcpp::IPv6Network netFrom(left);
+        pcpp::IPv6Network netTo(right);
+
+        if (netFrom.getPrefixLen() != netTo.getPrefixLen())
+            throw std::invalid_argument("the networks in the pair have different prefix lengths");
+
+        m_mapV6.emplace_back(netFrom, netTo);
+    }
+
 public:
     //! Constructor
     CCommandLineArguments() = default;
@@ -67,7 +183,7 @@ public:
         bool bShowVersion = false;
         bool bShowInterfaces = false;
         std::string strPortRemap;
-        std::string strDestRemap;
+        std::string strDestAddrRemap;
 
         static const char *szFilenameFlag = "file";
 
@@ -76,7 +192,7 @@ public:
         cxxopts::OptionAdder add = options.add_options();
         add(szFilenameFlag, "The input capture file path", cxxopts::value(m_strFilePath));
         add("r,portmap", "Rewrite port numbers", cxxopts::value(strPortRemap));
-        add("D,dstipmap", "Rewrite destination IP addresses", cxxopts::value(strPortRemap));
+        add("D,dstipmap", "Rewrite destination IP addresses", cxxopts::value(strDestAddrRemap));
         add("i,intf1", "Selects the interface to use", cxxopts::value(m_strInterface));
         add("l,loop", "Loop through the capture file X times", cxxopts::value(m_uRepeatTimes));
         add("L,limit", "Limit the number of packets to send", cxxopts::value(m_uLimitPackets));
@@ -144,49 +260,9 @@ public:
         else if (bLimitPackets)
             m_eLimit = ELimitMode::LIMIT_MAX_PACKETS;
 
-        // Parse the port remap
-        auto splitPortMappings = std::views::split(strPortRemap, ',');
-        for (auto &&portMapping : splitPortMappings)
-        {
-            // Find the colon delimiter
-            std::string_view svPortEntry(portMapping.begin(), portMapping.end());
-            const size_t nColon = svPortEntry.find(':');
-            if (std::string_view::npos == nColon)
-                throw std::invalid_argument("each port pair must be delimited by a colon ('from:to')");
-
-            // Right side
-            unsigned short usToPort = 0;
-            const std::from_chars_result rightMatch = std::from_chars(svPortEntry.begin() + nColon + 1, svPortEntry.end(), usToPort);
-            if (std::errc{} != rightMatch.ec || rightMatch.ptr != svPortEntry.end())
-                throw std::invalid_argument("invalid rewritten port");
-
-            // Left side can be a single port or a range
-            unsigned usFromPort1 = 0;
-            const std::from_chars_result leftMatch = std::from_chars(svPortEntry.begin(), svPortEntry.begin() + nColon, usFromPort1);
-            if (std::errc{} != leftMatch.ec)
-                throw std::invalid_argument("invalid matched port");
-
-            if (*leftMatch.ptr == '-')
-            {
-                // Left side is a range
-                unsigned usFromPort2 = 0;
-                const std::from_chars_result middleMatch = std::from_chars(leftMatch.ptr + 1, svPortEntry.begin() + nColon, usFromPort2);
-                if (std::errc{} != middleMatch.ec || middleMatch.ptr != svPortEntry.begin() + nColon)
-                    throw std::invalid_argument("invalid rewritten port");
-
-                if (usFromPort2 <= usFromPort1)
-                    throw std::invalid_argument("end port of range must be larger than start port");
-
-                // Store the full range in the map
-                for (unsigned p = usFromPort1; p <= usFromPort2; ++p)
-                    m_mapPorts[p] = usToPort;
-            }
-            else if (leftMatch.ptr == svPortEntry.begin() + nColon)
-            {
-                // Left side is a single port
-                m_mapPorts[usFromPort1] = usToPort;
-            }
-        }
+        // Parse the remaps
+        parse_port_remap(strPortRemap);
+        parse_dest_addr_remap(strDestAddrRemap);
 
         // The job is valid
         m_op = ECommandLineOperation::JOB;
@@ -277,12 +353,29 @@ public:
         return usOriginalPort;
     }
 
-    std::string_view get_ipv4_destination_remap(std::string_view dest_ipv4) const override
+    pcpp::IPv4Address get_ipv4_destination_remap(pcpp::IPv4Address const &inputAddr) const override
     {
-        return dest_ipv4; // TODO
+        // Find the remap entry containing this address
+        auto it = std::find_if(
+            m_mapV4.cbegin(), m_mapV4.cend(),
+            [&inputAddr](IPv4Remap const &pair)
+            { return pair.first.includes(inputAddr); });
+
+        // Return same address if not found
+        if (it == m_mapV4.cend())
+            return inputAddr;
+
+        // Combine network prefix with varying host
+        pcpp::IPv4Network const &remapToNetwork = it->second;
+        const uint32_t mask = 0xFFFFFFFF << (32 - remapToNetwork.getPrefixLen());
+
+        const uint32_t prefix = pcpp::netToHost32(remapToNetwork.getNetworkPrefix().toInt()) & mask;
+        const uint32_t host = pcpp::netToHost32(inputAddr.toInt()) & ~mask;
+
+        return pcpp::IPv4Address(pcpp::hostToNet32(prefix | host));
     }
 
-    std::string_view get_ipv6_destination_remap(std::string_view dest_ipv6) const override
+    pcpp::IPv6Address get_ipv6_destination_remap(pcpp::IPv6Address const &dest_ipv6) const override
     {
         return dest_ipv6; // TODO
     }

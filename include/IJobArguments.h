@@ -6,6 +6,9 @@
 #include "ELimitMode.h"
 #include "ESpeedMode.h"
 
+// Dependencies
+#include <pcapplusplus/IpAddress.h>
+
 // STD
 #include <string_view>
 
@@ -54,10 +57,10 @@ public:
     virtual unsigned short get_port_remap(unsigned short usOriginalPort) const = 0;
 
     //! Gets the remap of a destination IPv4 address
-    virtual std::string_view get_ipv4_destination_remap(std::string_view dest_ipv4) const = 0;
+    virtual pcpp::IPv4Address get_ipv4_destination_remap(pcpp::IPv4Address const &dest_ipv4) const = 0;
 
     //! Gets the remap of a destination IPv6 address
-    virtual std::string_view get_ipv6_destination_remap(std::string_view dest_ipv6) const = 0;
+    virtual pcpp::IPv6Address get_ipv6_destination_remap(pcpp::IPv6Address const &dest_ipv6) const = 0;
 };
 
 #endif // _I_JOB_ARGUMENTS_H_

@@ -20,7 +20,10 @@ TEST(cli, empty)
 
 TEST(cli, help)
 {
-    static const char *argv[] = {g_szBinaryName, "--help"};
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--help",
+    };
     auto pCli = parse_cli(std::size(argv), argv);
 
     EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::HELP);
@@ -28,7 +31,10 @@ TEST(cli, help)
 
 TEST(cli, version)
 {
-    static const char *argv[] = {g_szBinaryName, "--version"};
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--version",
+    };
     auto pCli = parse_cli(std::size(argv), argv);
 
     EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::VERSION);
@@ -36,7 +42,10 @@ TEST(cli, version)
 
 TEST(cli, list_interfaces)
 {
-    static const char *argv[] = {g_szBinaryName, "--interfaces"};
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--interfaces",
+    };
     auto pCli = parse_cli(std::size(argv), argv);
 
     EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::LIST_INTERFACES);
@@ -44,7 +53,12 @@ TEST(cli, list_interfaces)
 
 TEST(cli, invalid_multiple_modes)
 {
-    static const char *argv[] = {g_szBinaryName, "--help", "--version", "--interfaces"};
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--help",
+        "--version",
+        "--interfaces",
+    };
     auto pCli = parse_cli(std::size(argv), argv);
 
     EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::INVALID);
@@ -52,7 +66,11 @@ TEST(cli, invalid_multiple_modes)
 
 TEST(cli, loop)
 {
-    static const char *argv[] = {g_szBinaryName, "--loop=0", g_szInputFileName};
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--loop=0",
+        g_szInputFileName,
+    };
     auto pCli = parse_cli(std::size(argv), argv);
 
     EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
@@ -61,7 +79,11 @@ TEST(cli, loop)
 
 TEST(cli, repeat)
 {
-    static const char *argv[] = {g_szBinaryName, "--loop=123", g_szInputFileName};
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--loop=123",
+        g_szInputFileName,
+    };
     auto pCli = parse_cli(std::size(argv), argv);
 
     EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
@@ -91,7 +113,11 @@ TEST(cli, limit_duration)
 
 TEST(cli, limit_packets)
 {
-    static const char *argv[] = {g_szBinaryName, "--limit=1000", g_szInputFileName};
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--limit=1000",
+        g_szInputFileName,
+    };
     auto pCli = parse_cli(std::size(argv), argv);
 
     EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
@@ -101,7 +127,12 @@ TEST(cli, limit_packets)
 
 TEST(cli, invalid_multiple_limits)
 {
-    static const char *argv[] = {g_szBinaryName, "--limit=1000", "--duration=60", g_szInputFileName};
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--limit=1000",
+        "--duration=60",
+        g_szInputFileName,
+    };
     auto pCli = parse_cli(std::size(argv), argv);
 
     EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::INVALID);
@@ -109,7 +140,11 @@ TEST(cli, invalid_multiple_limits)
 
 TEST(cli, portremap_single)
 {
-    static const char *argv[] = {g_szBinaryName, "--portmap=80:8080", g_szInputFileName};
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--portmap=80:8080",
+        g_szInputFileName,
+    };
     auto pCli = parse_cli(std::size(argv), argv);
 
     EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
@@ -118,7 +153,11 @@ TEST(cli, portremap_single)
 
 TEST(cli, portremap_multi)
 {
-    static const char *argv[] = {g_szBinaryName, "--portmap=80:8080,443:8443", g_szInputFileName};
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--portmap=80:8080,443:8443",
+        g_szInputFileName,
+    };
     auto pCli = parse_cli(std::size(argv), argv);
 
     EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
@@ -128,11 +167,48 @@ TEST(cli, portremap_multi)
 
 TEST(cli, portremap_range_single)
 {
-    static const char *argv[] = {g_szBinaryName, "--portmap=8080-8090:3000", g_szInputFileName};
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--portmap=8080-8090:3000",
+        g_szInputFileName,
+    };
     auto pCli = parse_cli(std::size(argv), argv);
 
     EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
     EXPECT_EQ(pCli->get_job_arguments().get_port_remap(8080), 3000);
     EXPECT_EQ(pCli->get_job_arguments().get_port_remap(8085), 3000);
     EXPECT_EQ(pCli->get_job_arguments().get_port_remap(8090), 3000);
+}
+
+TEST(cli, destremap_v4_single)
+{
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--dstipmap=192.168.0.0/16:10.17.0.0/16",
+        g_szInputFileName,
+    };
+    auto pCli = parse_cli(std::size(argv), argv);
+
+    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
+    EXPECT_EQ(pCli->get_job_arguments().get_ipv4_destination_remap(
+                  pcpp::IPv4Address("192.168.10.20")),
+              pcpp::IPv4Address("10.17.10.20"));
+}
+
+TEST(cli, destremap_v4_multi)
+{
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--dstipmap=192.168.56.0/24:10.17.99.0/24,172.16.10.0/24:172.31.55.0/24",
+        g_szInputFileName,
+    };
+    auto pCli = parse_cli(std::size(argv), argv);
+
+    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
+    EXPECT_EQ(pCli->get_job_arguments().get_ipv4_destination_remap(
+                  pcpp::IPv4Address("192.168.56.123")),
+              pcpp::IPv4Address("10.17.99.123"));
+    EXPECT_EQ(pCli->get_job_arguments().get_ipv4_destination_remap(
+                  pcpp::IPv4Address("172.16.10.69")),
+              pcpp::IPv4Address("172.31.55.69"));
 }
