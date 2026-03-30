@@ -34,8 +34,15 @@ add_executable(${CMAKE_PROJECT_NAME}
     # Generated files
     ${VERSION_FILE_SRC}
     # App Sources
+    "src/parsecli.cpp"
     "src/main.cpp"
     # App Headers
+    "include/ELimitMode.h"
+    "include/ERepeatMode.h"
+    "include/ESpeedMode.h"
+    "include/IJobArguments.h"
+    "include/ICommandLineArguments.h"
+    "include/parsecli.h"
     "include/version.h" )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC 
