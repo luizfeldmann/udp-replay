@@ -1,0 +1,10 @@
+{
+  "name": "udp-player",
+  "version": "1.0.0.0",
+  "description": "Tool to replay UDP packets from a capture file.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/luizfeldmann/udp-replay"
+  }
+}
