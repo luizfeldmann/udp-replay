@@ -38,7 +38,8 @@ add_library(${CMAKE_PROJECT_NAME}-lib STATIC
     # Generated files
     ${VERSION_FILE_SRC}
     # Sources
-    "src/error.cpp"
+    "src/EAppError.cpp"
+    "src/CAppErrorCategory.cpp"
     "src/CCommandLineArguments.cpp"
     # Headers
     "include/ELimitMode.h"
@@ -47,7 +48,8 @@ add_library(${CMAKE_PROJECT_NAME}-lib STATIC
     "include/IJobArguments.h"
     "include/ICommandLineArguments.h"
     "include/CCommandLineArguments.h"
-    "include/error.h"
+    "include/EAppError.h"
+    "include/CAppErrorCategory.h"
     "include/version.h" )
 
 target_include_directories(${CMAKE_PROJECT_NAME}-lib PUBLIC 

@@ -1,16 +1,12 @@
 // Local
-#include "error.h"
+#include "CAppErrorCategory.h"
+#include "EAppError.h"
 #include "version.h"
 
 const std::error_category &app_error_category()
 {
     static const CAppErrorCategory instance;
     return instance;
-}
-
-std::error_code make_error_code(EAppError e)
-{
-    return {static_cast<int>(e), app_error_category()};
 }
 
 const char *CAppErrorCategory::name() const noexcept

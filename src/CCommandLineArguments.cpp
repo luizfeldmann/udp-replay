@@ -1,7 +1,7 @@
 // Local
 #include "CCommandLineArguments.h"
+#include "EAppError.h"
 #include "version.h"
-#include "error.h"
 
 // Dependencies
 #include <cxxopts.hpp>

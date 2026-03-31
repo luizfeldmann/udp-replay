@@ -2,7 +2,7 @@
 #include <gtest/gtest.h>
 
 // Local
-#include "error.h"
+#include "EAppError.h"
 #include "CCommandLineArguments.h"
 
 // Constants

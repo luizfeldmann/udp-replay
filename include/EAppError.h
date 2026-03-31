@@ -1,5 +1,5 @@
-#ifndef _ERROR_H_
-#define _ERROR_H_
+#ifndef _E_APP_ERROR_H_
+#define _E_APP_ERROR_H_
 
 // STD
 #include <system_error>
@@ -27,21 +27,6 @@ enum class EAppError
     InvalidIPv6Pair,
 };
 
-//! Category for the errors in this app
-class CAppErrorCategory
-    : public std::error_category
-{
-public:
-    //! Reads the name of the category
-    const char *name() const noexcept override;
-
-    //! Gets the error message from the error code
-    std::string message(int ev) const override;
-};
-
-//! Gets the singleton of the app error category
-const std::error_category &app_error_category();
-
 //! Converts the error code to an error object
 std::error_code make_error_code(EAppError);
 
@@ -55,4 +40,4 @@ namespace std
     };
 }
 
-#endif // _ERROR_H_
+#endif // _E_APP_ERROR_H_
