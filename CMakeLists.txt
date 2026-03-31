@@ -18,9 +18,6 @@ PROJECT(${CMAKE_PROJECT_NAME}
     DESCRIPTION "${CMAKE_PROJECT_DESCRIPTION}"
     HOMEPAGE_URL "${CMAKE_PROJECT_HOMEPAGE_URL}")
 
-# Link to find modules
-list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/build/generators")
-
 # Default directories
 include(GNUInstallDirs)
 
@@ -32,6 +29,7 @@ configure_file("src/version.in.c" ${VERSION_FILE_SRC})
 # Find dependencies
 find_package(cxxopts)
 find_package(PcapPlusPlus)
+find_package(Boost CONFIG REQUIRED)
 
 # Add helper library
 add_library(${CMAKE_PROJECT_NAME}-lib STATIC
@@ -41,6 +39,7 @@ add_library(${CMAKE_PROJECT_NAME}-lib STATIC
     "src/EAppError.cpp"
     "src/CAppErrorCategory.cpp"
     "src/CCommandLineArguments.cpp"
+    "src/CReplay.cpp"
     # Headers
     "include/ELimitMode.h"
     "include/ERepeatMode.h"
@@ -50,12 +49,14 @@ add_library(${CMAKE_PROJECT_NAME}-lib STATIC
     "include/CCommandLineArguments.h"
     "include/EAppError.h"
     "include/CAppErrorCategory.h"
+    "include/CReplay.h"
     "include/version.h" )
 
 target_include_directories(${CMAKE_PROJECT_NAME}-lib PUBLIC 
     "include" )
 
 target_link_libraries(${CMAKE_PROJECT_NAME}-lib PUBLIC
+    Boost::boost
     PcapPlusPlus::PcapPlusPlus
     cxxopts::cxxopts )
 

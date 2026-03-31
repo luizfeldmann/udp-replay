@@ -31,6 +31,15 @@ std::string CAppErrorCategory::message(int ev) const
     case EAppError::MissingArgInterface:
         return "missing required interface name";
 
+    case EAppError::UnsupportedFileType:
+        return "unsupport input file type";
+
+    case EAppError::FileNotFound:
+        return "file not found";
+
+    case EAppError::InterfaceNotFound:
+        return "no such interface";
+
     case EAppError::ConflictOperations:
         return "conflicting options";
 

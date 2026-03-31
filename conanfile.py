@@ -10,9 +10,14 @@ class Recipe(ConanFile):
     def requirements(self):
         self.requires("cxxopts/3.3.1")
         self.requires("pcapplusplus/25.05")
+        self.requires("boost/1.90.0")
 
     def build_requirements(self):
         self.test_requires("gtest/1.17.0")
+
+    def configure(self):
+        # Workaround because recipe for boost cobalt is currently broken on cpp20
+        self.options["boost"].without_cobalt = True
 
     def validate(self):
         check_min_cppstd(self, "20")
