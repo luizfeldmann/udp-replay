@@ -8,6 +8,7 @@
 enum class EAppError
 {
     Unknown = 0,
+    GenericArgumentsError,
     MissingArgFile,
     MissingArgInterface,
     ConflictOperations,

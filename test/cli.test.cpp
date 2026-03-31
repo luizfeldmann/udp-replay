@@ -2,7 +2,8 @@
 #include <gtest/gtest.h>
 
 // Local
-#include "parsecli.h"
+#include "error.h"
+#include "CCommandLineArguments.h"
 
 // Constants
 static const char *g_szBinaryName = "udp-replay";
@@ -14,9 +15,11 @@ static const char *g_szInterfaceArg = "-i=eth0";
 TEST(cli, empty)
 {
     static const char *argv[] = {g_szBinaryName};
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::INVALID);
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_EQ(ec, EAppError::MissingArgFile);
 }
 
 TEST(cli, help)
@@ -25,9 +28,12 @@ TEST(cli, help)
         g_szBinaryName,
         "--help",
     };
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::HELP);
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(cli.get_operation(), ECommandLineOperation::HELP);
 }
 
 TEST(cli, version)
@@ -36,9 +42,12 @@ TEST(cli, version)
         g_szBinaryName,
         "--version",
     };
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::VERSION);
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(cli.get_operation(), ECommandLineOperation::VERSION);
 }
 
 TEST(cli, list_interfaces)
@@ -47,9 +56,12 @@ TEST(cli, list_interfaces)
         g_szBinaryName,
         "--interfaces",
     };
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::LIST_INTERFACES);
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(cli.get_operation(), ECommandLineOperation::LIST_INTERFACES);
 }
 
 TEST(cli, invalid_multiple_modes)
@@ -60,9 +72,12 @@ TEST(cli, invalid_multiple_modes)
         "--version",
         "--interfaces",
     };
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::INVALID);
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_EQ(ec, EAppError::ConflictOperations);
+    EXPECT_EQ(cli.get_operation(), ECommandLineOperation::INVALID);
 }
 
 TEST(cli, loop)
@@ -73,10 +88,13 @@ TEST(cli, loop)
         g_szInterfaceArg,
         g_szInputFileName,
     };
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
-    EXPECT_EQ(pCli->get_job_arguments().get_repeat_mode(), ERepeatMode::LOOP);
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(cli.get_operation(), ECommandLineOperation::JOB);
+    EXPECT_EQ(cli.get_job_arguments().get_repeat_mode(), ERepeatMode::LOOP);
 }
 
 TEST(cli, repeat)
@@ -87,11 +105,14 @@ TEST(cli, repeat)
         g_szInterfaceArg,
         g_szInputFileName,
     };
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
-    EXPECT_EQ(pCli->get_job_arguments().get_repeat_mode(), ERepeatMode::REPEAT_TIMES);
-    EXPECT_EQ(pCli->get_job_arguments().get_repeat_count(), 123);
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(cli.get_operation(), ECommandLineOperation::JOB);
+    EXPECT_EQ(cli.get_job_arguments().get_repeat_mode(), ERepeatMode::REPEAT_TIMES);
+    EXPECT_EQ(cli.get_job_arguments().get_repeat_count(), 123);
 }
 
 TEST(cli, multiplier)
@@ -102,11 +123,14 @@ TEST(cli, multiplier)
         g_szInterfaceArg,
         g_szInputFileName,
     };
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
-    EXPECT_EQ(pCli->get_job_arguments().get_speed_mode(), ESpeedMode::SPEED_MULTIPLIER);
-    EXPECT_EQ(pCli->get_job_arguments().get_speed_multiplier(), 1.5);
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(cli.get_operation(), ECommandLineOperation::JOB);
+    EXPECT_EQ(cli.get_job_arguments().get_speed_mode(), ESpeedMode::SPEED_MULTIPLIER);
+    EXPECT_EQ(cli.get_job_arguments().get_speed_multiplier(), 1.5);
 }
 
 TEST(cli, limit_duration)
@@ -117,11 +141,14 @@ TEST(cli, limit_duration)
         g_szInterfaceArg,
         g_szInputFileName,
     };
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
-    EXPECT_EQ(pCli->get_job_arguments().get_limit_mode(), ELimitMode::LIMIT_MAX_TIME);
-    EXPECT_EQ(pCli->get_job_arguments().get_limit_duration(), 60);
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(cli.get_operation(), ECommandLineOperation::JOB);
+    EXPECT_EQ(cli.get_job_arguments().get_limit_mode(), ELimitMode::LIMIT_MAX_TIME);
+    EXPECT_EQ(cli.get_job_arguments().get_limit_duration(), 60);
 }
 
 TEST(cli, limit_packets)
@@ -132,11 +159,14 @@ TEST(cli, limit_packets)
         g_szInterfaceArg,
         g_szInputFileName,
     };
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
-    EXPECT_EQ(pCli->get_job_arguments().get_limit_mode(), ELimitMode::LIMIT_MAX_PACKETS);
-    EXPECT_EQ(pCli->get_job_arguments().get_limit_packets(), 1000);
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(cli.get_operation(), ECommandLineOperation::JOB);
+    EXPECT_EQ(cli.get_job_arguments().get_limit_mode(), ELimitMode::LIMIT_MAX_PACKETS);
+    EXPECT_EQ(cli.get_job_arguments().get_limit_packets(), 1000);
 }
 
 TEST(cli, invalid_multiple_limits)
@@ -148,9 +178,12 @@ TEST(cli, invalid_multiple_limits)
         g_szInterfaceArg,
         g_szInputFileName,
     };
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::INVALID);
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_EQ(ec, EAppError::ConflictLimit);
+    EXPECT_EQ(cli.get_operation(), ECommandLineOperation::INVALID);
 }
 
 TEST(cli, portremap_single)
@@ -161,10 +194,13 @@ TEST(cli, portremap_single)
         g_szInterfaceArg,
         g_szInputFileName,
     };
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
-    EXPECT_EQ(pCli->get_job_arguments().get_port_remap(80), 8080);
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(cli.get_operation(), ECommandLineOperation::JOB);
+    EXPECT_EQ(cli.get_job_arguments().get_port_remap(80), 8080);
 }
 
 TEST(cli, portremap_multi)
@@ -175,11 +211,12 @@ TEST(cli, portremap_multi)
         g_szInterfaceArg,
         g_szInputFileName,
     };
-    auto pCli = parse_cli(std::size(argv), argv);
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
-    EXPECT_EQ(pCli->get_job_arguments().get_port_remap(80), 8080);
-    EXPECT_EQ(pCli->get_job_arguments().get_port_remap(443), 8443);
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(cli.get_job_arguments().get_port_remap(80), 8080);
+    EXPECT_EQ(cli.get_job_arguments().get_port_remap(443), 8443);
 }
 
 TEST(cli, portremap_range_single)
@@ -190,12 +227,14 @@ TEST(cli, portremap_range_single)
         g_szInterfaceArg,
         g_szInputFileName,
     };
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
-    EXPECT_EQ(pCli->get_job_arguments().get_port_remap(8080), 3000);
-    EXPECT_EQ(pCli->get_job_arguments().get_port_remap(8085), 3000);
-    EXPECT_EQ(pCli->get_job_arguments().get_port_remap(8090), 3000);
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(cli.get_job_arguments().get_port_remap(8080), 3000);
+    EXPECT_EQ(cli.get_job_arguments().get_port_remap(8085), 3000);
+    EXPECT_EQ(cli.get_job_arguments().get_port_remap(8090), 3000);
 }
 
 TEST(cli, destremap_v4_single)
@@ -206,10 +245,13 @@ TEST(cli, destremap_v4_single)
         g_szInterfaceArg,
         g_szInputFileName,
     };
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
-    EXPECT_EQ(pCli->get_job_arguments().get_ipv4_destination_remap(
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(cli.get_operation(), ECommandLineOperation::JOB);
+    EXPECT_EQ(cli.get_job_arguments().get_ipv4_destination_remap(
                   pcpp::IPv4Address("192.168.10.20")),
               pcpp::IPv4Address("10.17.10.20"));
 }
@@ -222,13 +264,16 @@ TEST(cli, destremap_v4_multi)
         g_szInterfaceArg,
         g_szInputFileName,
     };
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
-    EXPECT_EQ(pCli->get_job_arguments().get_ipv4_destination_remap(
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(cli.get_operation(), ECommandLineOperation::JOB);
+    EXPECT_EQ(cli.get_job_arguments().get_ipv4_destination_remap(
                   pcpp::IPv4Address("192.168.56.123")),
               pcpp::IPv4Address("10.17.99.123"));
-    EXPECT_EQ(pCli->get_job_arguments().get_ipv4_destination_remap(
+    EXPECT_EQ(cli.get_job_arguments().get_ipv4_destination_remap(
                   pcpp::IPv4Address("172.16.10.69")),
               pcpp::IPv4Address("172.31.55.69"));
 }
@@ -241,10 +286,13 @@ TEST(cli, destremap_v6_64)
         g_szInterfaceArg,
         g_szInputFileName,
     };
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
-    EXPECT_EQ(pCli->get_job_arguments().get_ipv6_destination_remap(
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(cli.get_operation(), ECommandLineOperation::JOB);
+    EXPECT_EQ(cli.get_job_arguments().get_ipv6_destination_remap(
                   pcpp::IPv6Address("2001:db8::5678:9abc:def0:1111")),
               pcpp::IPv6Address("fd00:beef::5678:9abc:def0:1111"));
 }
@@ -257,10 +305,13 @@ TEST(cli, destremap_v6_36)
         g_szInterfaceArg,
         g_szInputFileName,
     };
-    auto pCli = parse_cli(std::size(argv), argv);
 
-    EXPECT_EQ(pCli->get_operation(), ECommandLineOperation::JOB);
-    EXPECT_EQ(pCli->get_job_arguments().get_ipv6_destination_remap(
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(cli.get_operation(), ECommandLineOperation::JOB);
+    EXPECT_EQ(cli.get_job_arguments().get_ipv6_destination_remap(
                   pcpp::IPv6Address("2001:db8:0bcd:1234:5678::1")),
               pcpp::IPv6Address("3001:dea:0bcd:1234:5678::1"));
 }

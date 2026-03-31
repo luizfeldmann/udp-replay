@@ -26,6 +26,9 @@ std::string CAppErrorCategory::message(int ev) const
     case EAppError::Unknown:
         return "unknown error";
 
+    case EAppError::GenericArgumentsError:
+        return "invalid arguments";
+
     case EAppError::MissingArgFile:
         return "missing required input file path";
 

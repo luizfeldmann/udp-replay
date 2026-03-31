@@ -1,6 +1,6 @@
 // Local project
 #include "version.h"
-#include "parsecli.h"
+#include "CCommandLineArguments.h"
 
 // Dependencies
 #include <pcapplusplus/PcapLiveDeviceList.h>
@@ -58,17 +58,25 @@ int main(int argc, const char **argv)
     std::cout << version_name() << " (" << version_number() << ")" << std::endl;
 
     // Parse the CLI
-    const std::unique_ptr<ICommandLineArguments> pCliArgs = parse_cli(argc, argv);
+    CCommandLineArguments cliArgs;
+    std::error_code ec = cliArgs.parse(argc, argv);
+
+    // Handle error in parsing the arguments
+    if (ec)
+    {
+        std::cerr << ec.message() << std::endl;
+        return EXIT_FAILURE;
+    }
 
     // Handle the operation requested in the CLI
-    switch (pCliArgs->get_operation())
+    switch (cliArgs.get_operation())
     {
     default:
     case ECommandLineOperation::INVALID:
         return EXIT_FAILURE;
 
     case ECommandLineOperation::HELP:
-        std::cout << pCliArgs->get_help() << std::endl;
+        std::cout << cliArgs.get_help() << std::endl;
         break;
 
     case ECommandLineOperation::VERSION:
