@@ -219,9 +219,6 @@ std::error_code CCommandLineArguments::parse_unsafe(int argc, const char **argv)
     if (m_strFilePath.empty())
         return EAppError::MissingArgFile;
 
-    if (m_strInterface.empty())
-        return EAppError::MissingArgInterface;
-
     // Validate the speed mode
     if (parsed.contains("multiplier"))
         m_eSpeed = ESpeedMode::SPEED_MULTIPLIER;
@@ -247,8 +244,11 @@ std::error_code CCommandLineArguments::parse_unsafe(int argc, const char **argv)
         m_eLimit = ELimitMode::LIMIT_MAX_PACKETS;
 
     // Parse the remaps
-    parse_port_remap(strPortRemap);
-    parse_dest_addr_remap(strDestAddrRemap);
+    if (std::error_code ec = parse_port_remap(strPortRemap))
+        return ec;
+
+    if (std::error_code ec = parse_dest_addr_remap(strDestAddrRemap))
+        return ec;
 
     // The job is valid
     m_op = ECommandLineOperation::JOB;

@@ -9,14 +9,45 @@
 #include <pcapplusplus/IPv4Layer.h>
 #include <pcapplusplus/IPv6Layer.h>
 
+#include <boost/functional/hash.hpp>
 #include <boost/asio/post.hpp>
 #include <boost/asio/signal_set.hpp>
 #include <boost/asio/bind_cancellation_slot.hpp>
+#include <boost/asio/ip/multicast.hpp>
 #include <boost/beast/core/bind_handler.hpp>
 
 // STD
 #include <iostream>
 #include <condition_variable>
+
+// OS
+#include <net/if.h>
+#include <ifaddrs.h>
+
+// socket_key
+
+CReplay::socket_key::socket_key(protocol_version v, cast_type c)
+    : m_ver(v), m_cast(c) {}
+
+bool CReplay::socket_key::operator==(socket_key const &other) const noexcept
+{
+    return (m_ver == other.m_ver) && (m_cast == other.m_cast);
+}
+
+std::size_t CReplay::socket_key::hash() const noexcept
+{
+    std::size_t seed = 0;
+    boost::hash_combine(seed, m_ver);
+    boost::hash_combine(seed, m_cast);
+    return seed;
+}
+
+std::size_t CReplay::socket_key_hasher::operator()(CReplay::socket_key const &k) const noexcept
+{
+    return k.hash();
+}
+
+// CReplay
 
 void CReplay::print_interfaces()
 {
@@ -60,6 +91,10 @@ CReplay::CReplay(IJobArguments const &args)
 {
 }
 
+CReplay::~CReplay()
+{
+}
+
 std::error_code CReplay::run_replay()
 {
     try
@@ -84,12 +119,10 @@ std::error_code CReplay::run_replay_unsafe()
 {
     // Open the replay file
     std::string strFilename(m_args.get_filename());
-    if (strFilename.ends_with(".pcap"))
-        m_pReader = std::make_unique<pcpp::PcapFileReaderDevice>(strFilename);
-    else if (strFilename.ends_with(".pcapng"))
+    if (strFilename.ends_with(".pcapng"))
         m_pReader = std::make_unique<pcpp::PcapNgFileReaderDevice>(strFilename);
     else
-        return EAppError::UnsupportedFileType;
+        m_pReader = std::make_unique<pcpp::PcapFileReaderDevice>(strFilename);
 
     // Handle error opening the file
     if (!m_pReader->open())
@@ -117,7 +150,9 @@ std::error_code CReplay::run_replay_unsafe()
 void CReplay::on_signal(boost::system::error_code const &ec, int sig)
 {
     // When receiving SIGINT, SIGTERM, etc... just cancel all operations
-    m_cancel_signal.emit(boost::asio::cancellation_type::all);
+    m_timer.cancel();
+    for (auto &[key, socket] : m_socket_pool)
+        socket.cancel();
 }
 
 bool CReplay::get_next_packet(pcpp::RawPacket &rawPacket)
@@ -184,13 +219,15 @@ void CReplay::schedule_next_packet()
     const timespec tsCurrent = rawPacket.getPacketTimeStamp();
 
     // There is no prev time for the first packet or when restarting on a loop
-    if (m_count_sent_loop)
+    if (m_count_sent_loop == 0)
         m_tsPrevPacket = tsCurrent;
 
     // calculate the time delta to the current packet
     std::chrono::steady_clock::duration deltaTime =
         std::chrono::seconds(tsCurrent.tv_sec - m_tsPrevPacket.tv_sec) +
         std::chrono::nanoseconds(tsCurrent.tv_nsec - m_tsPrevPacket.tv_nsec);
+
+    m_tsPrevPacket = tsCurrent;
 
     // apply speed multiplier factor
     if (m_args.get_speed_mode() == ESpeedMode::SPEED_MULTIPLIER)
@@ -204,8 +241,95 @@ void CReplay::schedule_next_packet()
     // schedule the event to send the next packet
     m_timer.expires_at(m_next_packet_time);
     m_timer.async_wait(
-        boost::asio::bind_cancellation_slot(m_cancel_signal.slot(),
-                                            boost::beast::bind_front_handler(&CReplay::on_send_packet, this, rawPacket)));
+        boost::beast::bind_front_handler(&CReplay::on_send_packet, this, rawPacket));
+}
+
+boost::asio::ip::address_v4 CReplay::get_interface_address(std::string_view iface)
+{
+    // get list of all interfaces from the OS
+    struct ifaddrs *ifaddr;
+    if (getifaddrs(&ifaddr) == -1)
+        throw std::runtime_error("getifaddrs");
+
+    boost::asio::ip::address_v4 result;
+    for (struct ifaddrs *ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next)
+    {
+        // ignore non v-4 addresses
+        if (ifa->ifa_addr == nullptr)
+            continue;
+        // compare name to requested
+        if (ifa->ifa_addr->sa_family == AF_INET && iface.compare(ifa->ifa_name) == 0)
+        {
+            struct sockaddr_in *sa = (struct sockaddr_in *)ifa->ifa_addr;
+            result = boost::asio::ip::address_v4(ntohl(sa->sin_addr.s_addr));
+            break;
+        }
+    }
+
+    // cleanup
+    freeifaddrs(ifaddr);
+
+    if (result.is_unspecified())
+        throw std::system_error(EAppError::InterfaceNotFound);
+
+    return result;
+}
+
+unsigned int CReplay::get_interface_index(std::string_view iface)
+{
+    // find index from name
+    const std::string ifacestr(iface);
+    unsigned int idx = if_nametoindex(ifacestr.c_str());
+    if (0 == idx)
+        throw std::system_error(EAppError::InterfaceNotFound);
+
+    return idx;
+}
+
+boost::asio::ip::udp::socket &CReplay::find_or_create_socket(boost::asio::ip::udp::endpoint const &endpoint)
+{
+    const auto [it, isCreated] = m_socket_pool.try_emplace(
+        // find based on combination of protocol version and cast type
+        socket_key(
+            endpoint.address().is_v4() ? socket_key::protocol_version::ipv4 : socket_key::protocol_version::ipv6,
+            endpoint.address().is_multicast() ? socket_key::cast_type::multicast : socket_key::cast_type::unicast),
+        // arguments to build the socket
+        m_io);
+
+    auto &[key, socket] = *it;
+
+    // first time initialization
+    if (isCreated)
+    {
+        // open the socket with the correct protocol
+        socket.open(key.m_ver == socket_key::protocol_version::ipv4
+                        ? boost::asio::ip::udp::v4()
+                        : boost::asio::ip::udp::v6());
+
+        // bind the the network interface if using multicast
+        if (key.m_cast == socket_key::cast_type::multicast)
+        {
+            const std::string_view iface = m_args.get_interface_name();
+            if (iface.empty())
+                throw std::system_error(EAppError::MissingArgInterface);
+
+            if (key.m_ver == socket_key::protocol_version::ipv4)
+            {
+                socket.set_option(
+                    boost::asio::ip::multicast::outbound_interface(
+                        get_interface_address(iface)));
+            }
+            else
+            {
+
+                socket.set_option(
+                    boost::asio::ip::multicast::outbound_interface(
+                        get_interface_index(iface)));
+            }
+        }
+    }
+
+    return socket;
 }
 
 void CReplay::on_send_packet(pcpp::RawPacket rawPacket, boost::system::error_code const &ec)
@@ -230,13 +354,53 @@ void CReplay::on_send_packet(pcpp::RawPacket rawPacket, boost::system::error_cod
     {
         // continue to next packet without sending this one
         boost::asio::post(m_io, boost::beast::bind_front_handler(&CReplay::schedule_next_packet, this));
+        return;
     }
 
     // perform the rewrites in ports and addresses
     unsigned short usDestPort = m_args.get_port_remap(pUdp->getDstPort());
 
+    boost::asio::ip::udp::endpoint destination;
     if (pIp4)
-        m_args.get_ipv4_destination_remap(pIp4->getDstIPv4Address());
+    {
+        const auto addr = m_args.get_ipv4_destination_remap(pIp4->getDstIPv4Address());
+        destination = boost::asio::ip::udp::endpoint(
+            boost::asio::ip::address_v4(addr.toByteArray()), usDestPort);
+    }
     else
-        m_args.get_ipv6_destination_remap(pIp6->getDstIPv6Address());
+    {
+        const auto addr = m_args.get_ipv6_destination_remap(pIp6->getDstIPv6Address());
+        destination = boost::asio::ip::udp::endpoint(
+            boost::asio::ip::address_v6(addr.toByteArray()), usDestPort);
+    }
+
+    // find or create a socket matching v4/v6, unicast/multicast
+    auto &socket = find_or_create_socket(destination);
+
+    // send out the packet data
+    const uint8_t *const pPayload = pUdp->getLayerPayload();
+    m_send_buf.assign(
+        pPayload, pPayload + pUdp->getLayerPayloadSize());
+
+    socket.async_send_to(
+        boost::asio::buffer(m_send_buf), destination,
+        boost::beast::bind_front_handler(&CReplay::on_sent_complete, this));
+}
+
+void CReplay::on_sent_complete(boost::system::error_code const &ec, size_t)
+{
+    // handle interrupted by user
+    if (ec == boost::asio::error::operation_aborted)
+        return;
+
+    // propagate unexpected errors to the caller
+    if (ec)
+        throw std::system_error(ec);
+
+    // count packets
+    ++m_count_sent_total;
+    ++m_count_sent_loop;
+
+    // continue
+    schedule_next_packet();
 }

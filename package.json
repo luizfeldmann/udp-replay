@@ -1,5 +1,5 @@
 {
-  "name": "udp-player",
+  "name": "udp-replay",
   "version": "1.0.0.0",
   "description": "Tool to replay UDP packets from a capture file.",
   "license": "MIT",

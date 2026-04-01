@@ -7,6 +7,8 @@
 // Dependencies
 #include <pcapplusplus/PcapFileDevice.h>
 
+#include <boost/asio/ip/udp.hpp>
+#include <boost/unordered_map.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/cancellation_signal.hpp>
 #include <boost/asio/steady_timer.hpp>
@@ -48,6 +50,55 @@ private:
     //! The time to present the next packet
     std::chrono::steady_clock::time_point m_next_packet_time;
 
+    //! Key to identify a socket in the pool
+    struct socket_key
+    {
+        //! protocol version
+        enum class protocol_version : uint8_t
+        {
+            ipv4 = 4,
+            ipv6 = 6
+        } m_ver;
+
+        //! cast type
+        enum class cast_type : uint8_t
+        {
+            unicast,
+            multicast
+        } m_cast;
+
+        //! constructor
+        socket_key(protocol_version, cast_type);
+
+        //! Comparator
+        bool operator==(socket_key const &) const noexcept;
+
+        //! Hasher
+        size_t hash() const noexcept;
+    };
+
+    //! Helper functor to hash the socket key
+    struct socket_key_hasher
+    {
+        //! Hashes the socket key
+        std::size_t operator()(CReplay::socket_key const &) const noexcept;
+    };
+
+    //! Collection of allocated sockets
+    boost::unordered_map<socket_key, boost::asio::ip::udp::socket, socket_key_hasher> m_socket_pool;
+
+    // Buffer of TX data
+    std::vector<uint8_t> m_send_buf;
+
+    //! Gets the address associated to the v4 network interface
+    static boost::asio::ip::address_v4 get_interface_address(std::string_view);
+
+    //! Gets the index of the v6 interface
+    static unsigned int get_interface_index(std::string_view);
+
+    //! Finds an existing socket in the pool or creates it
+    boost::asio::ip::udp::socket &find_or_create_socket(boost::asio::ip::udp::endpoint const &);
+
     //! Gets the next packet
     //! Handles looping and limiting
     bool get_next_packet(pcpp::RawPacket &);
@@ -56,10 +107,13 @@ private:
     void schedule_next_packet();
 
     //! Callback for when a packet is ready to be sent
-    void on_send_packet(pcpp::RawPacket rawPacket, boost::system::error_code const &ec);
+    void on_send_packet(pcpp::RawPacket, boost::system::error_code const &);
+
+    //! Callback after a packet sending is complete
+    void on_sent_complete(boost::system::error_code const &, size_t);
 
     //! Callback for when a signal is emitted
-    void on_signal(boost::system::error_code const &ec, int sig);
+    void on_signal(boost::system::error_code const &, int);
 
     //! Throwing runner for the job
     std::error_code run_replay_unsafe();
@@ -67,6 +121,9 @@ private:
 public:
     //! Constructor
     CReplay(IJobArguments const &);
+
+    //! Destructor
+    ~CReplay();
 
     //! Executes the replay job
     std::error_code run_replay();
