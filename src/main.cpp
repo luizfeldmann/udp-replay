@@ -9,9 +9,6 @@
 //! App entry point
 int main(int argc, const char **argv)
 {
-    // Print header
-    std::cout << version_name() << " (" << version_number() << ")" << std::endl;
-
     // Parse the CLI
     CCommandLineArguments cliArgs;
     std::error_code ec = cliArgs.parse(argc, argv);
@@ -31,10 +28,13 @@ int main(int argc, const char **argv)
         return EXIT_FAILURE;
 
     case ECommandLineOperation::HELP:
+        std::cout << version_name() << " (v" << version_number() << ")" << std::endl;
         std::cout << cliArgs.get_help() << std::endl;
         break;
 
     case ECommandLineOperation::VERSION:
+        std::cout << version_name() << std::endl;
+        std::cout << "v" << version_number() << std::endl;
         std::cout << "Built: " << build_timestamp() << std::endl;
         std::cout << "Homepage: " << project_homepage_url() << std::endl;
         std::cout << "License: " << project_license_name() << std::endl;

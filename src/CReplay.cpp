@@ -168,8 +168,7 @@ bool CReplay::get_next_packet(pcpp::RawPacket &rawPacket)
 
     case ELimitMode::LIMIT_MAX_TIME:
         // Check if time limitation has elapsed
-        const auto now = std::chrono::steady_clock::now();
-        if (now > m_start_time + std::chrono::seconds(m_args.get_limit_duration()))
+        if (m_next_packet_time - m_start_time > std::chrono::seconds(m_args.get_limit_duration()))
             return false;
         break;
     }
@@ -232,7 +231,9 @@ void CReplay::schedule_next_packet()
     // apply speed multiplier factor
     if (m_args.get_speed_mode() == ESpeedMode::SPEED_MULTIPLIER)
     {
-        deltaTime /= m_args.get_speed_multiplier();
+        deltaTime = std::chrono::steady_clock::duration(
+            std::chrono::steady_clock::rep(
+                deltaTime.count() / m_args.get_speed_multiplier()));
     }
 
     // monotonically increment the presentation time
@@ -385,6 +386,20 @@ void CReplay::on_send_packet(pcpp::RawPacket rawPacket, boost::system::error_cod
     socket.async_send_to(
         boost::asio::buffer(m_send_buf), destination,
         boost::beast::bind_front_handler(&CReplay::on_sent_complete, this));
+
+    // print the sent packet info
+    if (!m_args.is_verbose())
+        return;
+
+    const std::string log = std::format(
+        "[{:06} / {:06}] {:09.6f} --> dst {} : {}, len {}",
+        m_count_sent_loop,
+        m_count_sent_total,
+        std::chrono::duration<double>(m_next_packet_time - m_start_time).count(),
+        destination.address().to_string(),
+        destination.port(),
+        m_send_buf.size());
+    std::cout << log << std::endl;
 }
 
 void CReplay::on_sent_complete(boost::system::error_code const &ec, size_t)
