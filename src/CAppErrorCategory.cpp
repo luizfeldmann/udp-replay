@@ -76,7 +76,7 @@ std::string CAppErrorCategory::message(int ev) const
     case EAppError::InvalidAddressDelimiter:
         return "expected colon (':') delimiter in address rewrite pair";
 
-    case EAppError::InvalidPrefixLengthUnmatch:
+    case EAppError::InvalidPrefixLengthMismatch:
         return "the networks in the pair have different prefix lengths";
 
     case EAppError::InvalidIPv6Pair:

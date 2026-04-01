@@ -8,7 +8,6 @@
 // Constants
 static const char *g_szBinaryName = "udp-replay";
 static const char *g_szInputFileName = "test-file.pcap";
-static const char *g_szInterfaceArg = "-i=eth0";
 
 // Test cases
 
@@ -80,12 +79,27 @@ TEST(cli, invalid_multiple_modes)
     EXPECT_EQ(cli.get_operation(), ECommandLineOperation::INVALID);
 }
 
+TEST(cli, basic)
+{
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--intf1=eth0",
+        g_szInputFileName,
+    };
+
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(cli.get_job_arguments().get_filename(), g_szInputFileName);
+    EXPECT_EQ(cli.get_job_arguments().get_interface_name(), "eth0");
+}
+
 TEST(cli, loop)
 {
     static const char *argv[] = {
         g_szBinaryName,
         "--loop=0",
-        g_szInterfaceArg,
         g_szInputFileName,
     };
 
@@ -102,7 +116,6 @@ TEST(cli, repeat)
     static const char *argv[] = {
         g_szBinaryName,
         "--loop=123",
-        g_szInterfaceArg,
         g_szInputFileName,
     };
 
@@ -120,7 +133,6 @@ TEST(cli, multiplier)
     static const char *argv[] = {
         g_szBinaryName,
         "--multiplier=1.5",
-        g_szInterfaceArg,
         g_szInputFileName,
     };
 
@@ -138,7 +150,6 @@ TEST(cli, limit_duration)
     static const char *argv[] = {
         g_szBinaryName,
         "--duration=60",
-        g_szInterfaceArg,
         g_szInputFileName,
     };
 
@@ -156,7 +167,6 @@ TEST(cli, limit_packets)
     static const char *argv[] = {
         g_szBinaryName,
         "--limit=1000",
-        g_szInterfaceArg,
         g_szInputFileName,
     };
 
@@ -175,7 +185,6 @@ TEST(cli, invalid_multiple_limits)
         g_szBinaryName,
         "--limit=1000",
         "--duration=60",
-        g_szInterfaceArg,
         g_szInputFileName,
     };
 
@@ -191,7 +200,6 @@ TEST(cli, portremap_single)
     static const char *argv[] = {
         g_szBinaryName,
         "--portmap=80:8080",
-        g_szInterfaceArg,
         g_szInputFileName,
     };
 
@@ -208,7 +216,6 @@ TEST(cli, portremap_multi)
     static const char *argv[] = {
         g_szBinaryName,
         "--portmap=80:8080,443:8443",
-        g_szInterfaceArg,
         g_szInputFileName,
     };
     CCommandLineArguments cli;
@@ -224,7 +231,6 @@ TEST(cli, portremap_range_single)
     static const char *argv[] = {
         g_szBinaryName,
         "--portmap=8080-8090:3000",
-        g_szInterfaceArg,
         g_szInputFileName,
     };
 
@@ -242,7 +248,6 @@ TEST(cli, destremap_v4_single)
     static const char *argv[] = {
         g_szBinaryName,
         "--dstipmap=192.168.0.0/16:10.17.0.0/16",
-        g_szInterfaceArg,
         g_szInputFileName,
     };
 
@@ -261,7 +266,6 @@ TEST(cli, destremap_v4_multi)
     static const char *argv[] = {
         g_szBinaryName,
         "--dstipmap=192.168.56.0/24:10.17.99.0/24,172.16.10.0/24:172.31.55.0/24",
-        g_szInterfaceArg,
         g_szInputFileName,
     };
 
@@ -278,12 +282,25 @@ TEST(cli, destremap_v4_multi)
               pcpp::IPv4Address("172.31.55.69"));
 }
 
+TEST(cli, mismatch_prefixes)
+{
+    static const char *argv[] = {
+        g_szBinaryName,
+        "--dstipmap=1.2.3.4/8:5.6.7.8/16",
+        g_szInputFileName,
+    };
+
+    CCommandLineArguments cli;
+    std::error_code ec = cli.parse(std::size(argv), argv);
+
+    EXPECT_EQ(ec, EAppError::InvalidPrefixLengthMismatch);
+}
+
 TEST(cli, destremap_v6_64)
 {
     static const char *argv[] = {
         g_szBinaryName,
         "--dstipmap=[2001:db8::/64]:[fd00:beef::/64]",
-        g_szInterfaceArg,
         g_szInputFileName,
     };
 
@@ -302,7 +319,6 @@ TEST(cli, destremap_v6_36)
     static const char *argv[] = {
         g_szBinaryName,
         "--dstipmap=[2001:db8::/36]:[3001:dea::/36]",
-        g_szInterfaceArg,
         g_szInputFileName,
     };
 

@@ -103,7 +103,7 @@ std::error_code CCommandLineArguments::parse_addr_remap_v4(const std::string_vie
     pcpp::IPv4Network netTo(right);
 
     if (netFrom.getPrefixLen() != netTo.getPrefixLen())
-        return EAppError::InvalidPrefixLengthUnmatch;
+        return EAppError::InvalidPrefixLengthMismatch;
 
     m_mapV4.emplace_back(netFrom, netTo);
 
@@ -127,7 +127,7 @@ std::error_code CCommandLineArguments::parse_addr_remap_v6(const std::string_vie
     pcpp::IPv6Network netTo(right);
 
     if (netFrom.getPrefixLen() != netTo.getPrefixLen())
-        return EAppError::InvalidPrefixLengthUnmatch;
+        return EAppError::InvalidPrefixLengthMismatch;
 
     m_mapV6.emplace_back(netFrom, netTo);
 

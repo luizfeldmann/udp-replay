@@ -26,7 +26,7 @@ enum class EAppError
     InvalidPortDelimiter,
     InvalidPortRangeOrder,
     InvalidAddressDelimiter,
-    InvalidPrefixLengthUnmatch,
+    InvalidPrefixLengthMismatch,
     InvalidIPv6Pair,
 };
 
