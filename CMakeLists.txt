@@ -83,3 +83,6 @@ if(BUILD_TESTS)
     include(GoogleTest)
     gtest_discover_tests(unit-tests)
 endif()
+
+# Install target
+install(TARGETS ${CMAKE_PROJECT_NAME})

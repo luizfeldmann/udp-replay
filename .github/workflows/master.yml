@@ -1,0 +1,25 @@
+name: Build on Master
+
+on:
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runs-on: ubuntu-latest
+          - arch: arm64
+            runs-on: ubuntu-latest-arm64
+    uses: ./.github/workflows/build.yml
+    with:
+      arch: ${{ matrix.arch }}
+      runs-on: ${{ matrix.runs-on }}
+      build_type: Release
