@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runs-on: ubuntu-latest
+          - arch: arm64
+            runs-on: ubuntu-latest-arm64
+    uses: ./.github/workflows/build.yml
+    with:
+      arch: ${{ matrix.arch }}
+      runs-on: ${{ matrix.runs-on }}
+      build_type: Release
+
+  publish-release:
+    name: Publish ${{ matrix.arch }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+          - arch: arm64
+    if: success()
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-${{ matrix.arch }}
+          path: artifact
+
+      - name: Upload asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag_name="${GITHUB_REF#refs/tags/}"
+          file=$(ls artifact/*)
+          filename=$(basename "$file")
+          renamed_file="${filename%.*}-${{ matrix.arch }}${filename##*.}"
+          mv "$file" "$renamed_file"
+          gh release upload "$tag_name" "$renamed_file" --clobber

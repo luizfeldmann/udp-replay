@@ -1,0 +1,56 @@
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      arch:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+      build_type:
+        required: true
+        type: string
+
+jobs:
+  build:
+    name: Build for ${{ inputs.arch }}
+    runs-on: ${{ inputs.runs-on }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            python3 \
+            python3-pip
+
+      - name: Install Conan
+        run: |
+          pip3 install --upgrade pip
+          pip3 install conan
+          conan profile detect
+
+      - name: Install dependencies
+        run: conan install . --build=missing -s build_type=${{ inputs.build_type }}
+
+      - name: Build
+        run: conan build .
+
+      - name: Run unit tests
+        run: |
+          cd build/${{ inputs.build_type }}
+          ctest --output-on-failure
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ inputs.arch }}
+          retention-days: 1
+          path: build/${{ inputs.build_type }}/udp-replay
