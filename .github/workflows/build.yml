@@ -3,19 +3,19 @@ name: Build
 on:
   workflow_call:
     inputs:
-      arch:
-        required: true
-        type: string
-      runs-on:
+      profile:
         required: true
         type: string
       build_type:
         required: true
         type: string
+      runs-on:
+        required: true
+        type: string
 
 jobs:
   build:
-    name: Build for ${{ inputs.arch }}
+    name: Build for ${{ inputs.profile }}
     runs-on: ${{ inputs.runs-on }}
 
     steps:
@@ -38,10 +38,15 @@ jobs:
           conan profile detect
 
       - name: Install dependencies
-        run: conan install . --build=missing -s build_type=${{ inputs.build_type }}
+        run: |
+          conan install . \
+          --profile=profiles/${{ inputs.profile }} \
+          --build=missing
 
       - name: Build
-        run: conan build .
+        run: |
+          conan build . \
+          --profile=profiles/${{ inputs.profile }}
 
       - name: Run unit tests
         run: |
@@ -51,6 +56,6 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ inputs.arch }}
+          name: build-${{ inputs.profile }}
           retention-days: 1
           path: build/${{ inputs.build_type }}/udp-replay

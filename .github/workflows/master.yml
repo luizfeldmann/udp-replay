@@ -14,12 +14,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - arch: x86_64
+          - profile: linux-gcc13-x86_64-release
             runs-on: ubuntu-latest
-          - arch: arm64
+          - profile: linux-gcc13-arm64-release
             runs-on: ubuntu-latest-arm64
     uses: ./.github/workflows/build.yml
     with:
-      arch: ${{ matrix.arch }}
+      profile: ${{ matrix.profile }}
       runs-on: ${{ matrix.runs-on }}
       build_type: Release

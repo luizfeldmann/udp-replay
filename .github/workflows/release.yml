@@ -10,31 +10,33 @@ jobs:
     strategy:
       matrix:
         include:
-          - arch: x86_64
+          - profile: linux-gcc13-x86_64-release
             runs-on: ubuntu-latest
-          - arch: arm64
+          - profile: linux-gcc13-arm64-release
             runs-on: ubuntu-latest-arm64
     uses: ./.github/workflows/build.yml
     with:
-      arch: ${{ matrix.arch }}
+      profile: ${{ matrix.profile }}
       runs-on: ${{ matrix.runs-on }}
       build_type: Release
 
   publish-release:
-    name: Publish ${{ matrix.arch }}
+    name: Publish ${{ matrix.alias }}
     needs: build
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          - arch: x86_64
-          - arch: arm64
+          - alias: linux-x86_64
+            profile: linux-gcc13-x86_64-release
+          - alias: linux-arm64
+            profile: linux-gcc13-arm64-release
     if: success()
 
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: build-${{ matrix.arch }}
+          name: build-${{ matrix.profile }}
           path: artifact
 
       - name: Upload asset
@@ -44,6 +46,6 @@ jobs:
           tag_name="${GITHUB_REF#refs/tags/}"
           file=$(ls artifact/*)
           filename=$(basename "$file")
-          renamed_file="${filename%.*}-${{ matrix.arch }}${filename##*.}"
+          renamed_file="${filename%.*}-${{ matrix.alias }}${filename##*.}"
           mv "$file" "$renamed_file"
           gh release upload "$tag_name" "$renamed_file" --clobber
