@@ -16,8 +16,6 @@ jobs:
         include:
           - profile: linux-gcc13-x86_64-release
             runs-on: ubuntu-latest
-          - profile: linux-gcc13-arm64-release
-            runs-on: ubuntu-latest-arm64
     uses: ./.github/workflows/build.yml
     with:
       profile: ${{ matrix.profile }}

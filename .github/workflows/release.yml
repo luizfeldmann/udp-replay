@@ -12,8 +12,6 @@ jobs:
         include:
           - profile: linux-gcc13-x86_64-release
             runs-on: ubuntu-latest
-          - profile: linux-gcc13-arm64-release
-            runs-on: ubuntu-latest-arm64
     uses: ./.github/workflows/build.yml
     with:
       profile: ${{ matrix.profile }}
@@ -24,16 +22,20 @@ jobs:
     name: Publish ${{ matrix.alias }}
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     strategy:
       matrix:
         include:
           - alias: linux-x86_64
             profile: linux-gcc13-x86_64-release
-          - alias: linux-arm64
-            profile: linux-gcc13-arm64-release
     if: success()
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
       - uses: actions/download-artifact@v8
         with:
           name: build-${{ matrix.profile }}
@@ -44,8 +46,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag_name="${GITHUB_REF#refs/tags/}"
+          echo $tag_name
           file=$(ls artifact/*)
           filename=$(basename "$file")
-          renamed_file="${filename%.*}-${{ matrix.alias }}${filename##*.}"
+          renamed_file="${{ matrix.alias }}-${filename}"
           mv "$file" "$renamed_file"
+          echo $renamed_file
           gh release upload "$tag_name" "$renamed_file" --clobber
