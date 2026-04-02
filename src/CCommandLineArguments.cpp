@@ -379,7 +379,8 @@ pcpp::IPv6Address CCommandLineArguments::get_ipv6_destination_remap(pcpp::IPv6Ad
 
     // Found a network to remap
     pcpp::IPv6Network const &remapToNetwork = it->second;
-    const uint8_t *pNetworkPrefix = remapToNetwork.getNetworkPrefix().toBytes();
+    const auto prefixAddress = remapToNetwork.getNetworkPrefix();
+    const uint8_t *pNetworkPrefix = prefixAddress.toBytes();
     const uint8_t *pInputAddr = inputAddr.toBytes();
 
     // The network prefix has a part with whole bytes then a split byte
@@ -389,7 +390,7 @@ pcpp::IPv6Address CCommandLineArguments::get_ipv6_destination_remap(pcpp::IPv6Ad
 
     // Combine network prefix with varying host
     uint8_t i = 0;
-    uint8_t result[16];
+    uint8_t result[16]{0x00};
 
     // Bytes fully defined by the network prefix
     for (; i < uFullBytes; ++i)
