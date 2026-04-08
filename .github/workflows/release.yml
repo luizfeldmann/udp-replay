@@ -10,13 +10,23 @@ jobs:
     strategy:
       matrix:
         include:
-          - profile: linux-gcc13-x86_64-release
+          - profile: debian-gcc13-x86_64-release
             runs-on: ubuntu-latest
+            container_image: debian:13
+            package_manager: apt
+
+          - profile: alpine-gcc15-x86_64-release
+            runs-on: ubuntu-latest
+            container_image: alpine:3.23
+            package_manager: apk
+
     uses: ./.github/workflows/build.yml
     with:
       profile: ${{ matrix.profile }}
       runs-on: ${{ matrix.runs-on }}
       build_type: Release
+      container_image: ${{ matrix.container_image }}
+      package_manager: ${{ matrix.package_manager }}
 
   publish-release:
     name: Publish ${{ matrix.alias }}
@@ -28,8 +38,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - alias: linux-x86_64
-            profile: linux-gcc13-x86_64-release
+          - alias: debian-x86_64
+            profile: debian-gcc13-x86_64-release
+          - alias: alpine-x86_64
+            profile: alpine-gcc15-x86_64-release
     if: success()
 
     steps:

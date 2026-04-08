@@ -13,7 +13,8 @@ class Recipe(ConanFile):
         self.requires("boost/1.90.0")
 
     def build_requirements(self):
-        self.test_requires("gtest/1.17.0")
+        # Note: Version 1.17 fails to build for Alpine
+        self.test_requires("gtest/1.16.0")
 
     def configure(self):
         # Workaround because recipe for boost cobalt is currently broken on cpp20
